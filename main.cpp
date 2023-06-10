@@ -1,60 +1,76 @@
 #include <bits/stdc++.h>
 using namespace std;
 
-map<string, pair<int, string>> OPTAB;
-map<string, int> SYMTAB;
-vector<pair<int, vector<string>>> prog;
-map<string, string> REGS;
-vector<pair<int, string>> obcode;
-vector<int> modify;
-string programName;
-int LOCCTR = 0, base = 0, pc = 0, indx = 0;
-bool checkpc = 0;
+class Assembler {
+   public:
+    int compile(string);
+    void loadInstructions();
+    void loadRegisters();
+    map<string, pair<int, string>> OPTAB;
+    map<string, string> REGS;
 
-int wordsize(string);
-int bytesize(string);
-int hextoint(string);
-string inttohex(int, int);
-string bintohex(int, int, int, int);
-string readdr(string);
-string format2(int);
-string format3(int);
-string format4(int);
-void objectFile();
-void getInput(string, string &, string &, string &);
+   private:
+    map<string, int> SYMTAB;
+    vector<pair<int, vector<string>>> prog;
+    vector<pair<int, string>> obcode;
+    vector<int> modify;
+    string programName;
+    int LOCCTR = 0, base = 0, pc = 0, indx = 0;
+    bool checkpc = 0;
 
-int main() {
-    string filename;
-    ifstream input;
-    do {
-        cout << "Enter the file's name you want to assemble: ";
-        cin >> filename;
-        input.open(filename);
-        if (input.fail())
-            cout << "Not Found" << endl;
-    } while (input.fail());
+    int wordsize(string);
+    int bytesize(string);
+    int hextoint(string);
+    string inttohex(int, int);
+    string bintohex(int, int, int, int);
+    string readdr(string);
+    string format2(int);
+    string format3(int);
+    string format4(int);
+    void writeObjectFile();
+    void getInput(string, string &, string &, string &);
+};
 
-    ifstream instrFile("instructions.txt");  // opens the instructions file
-    string x, y, z;
+void Assembler::loadInstructions() {
+    ifstream f("instructions.txt");  // opens the instructions file
+    string x, y;
     int a;
-    while (!instrFile.eof()) {
+    while (!f.eof()) {
         // x: instruction
         // a: format
-        // z: hex number
-        instrFile >> x >> a >> z;
-        OPTAB[x] = {a, z};
+        // y: hex number
+        f >> x >> a >> y;
+        OPTAB[x] = {a, y};
     }
-    instrFile.close();
-    instrFile.open("registers.txt");  // opens the registers file
-    while (!instrFile.eof()) {
+    f.close();
+}
+
+void Assembler::loadRegisters() {
+    ifstream f("registers.txt");  // opens the registers file
+    string x, y;
+    while (!f.eof()) {
         // x: register name
         // y: register code
-        instrFile >> x >> y;
+        f >> x >> y;
         REGS[x] = y;  // maps every register name with it's number
     }
+    f.close();
+}
+
+int Assembler::compile(string filename) {
+    ifstream input(filename);  // opens the input file
+
+    if (input.fail()) {
+        cout << "File not found" << endl;
+        return 1;
+    }
+
+    loadInstructions();
+    loadRegisters();
+
+    string l, x, y, z;
 
     //------------pass 1-----------//
-    string l;
     while (getline(input, l)) {
         getInput(l, x, y, z);
         if (x[0] == '.')
@@ -157,15 +173,16 @@ int main() {
         else if (prog[i].second[3].length() != 0)
             obcode.push_back({prog[i].first, prog[i].second[3]});
     }
-    objectFile();
+
+    writeObjectFile();
     return 0;
 }
 
-int wordsize(string s) {
+int Assembler::wordsize(string s) {
     return s.length() / 2;
 }
 
-int bytesize(string adr) {
+int Assembler::bytesize(string adr) {
     if (adr[0] == 'C') {
         string s = adr.substr(2, adr.size() - 3);
         return s.size();
@@ -174,12 +191,12 @@ int bytesize(string adr) {
     return 0;
 }
 
-int hextoint(string hexstring) {
+int Assembler::hextoint(string hexstring) {
     int number = (int)strtol(hexstring.c_str(), NULL, 16);
     return number;
 }
 
-string inttohex(int n, int prelength) {
+string Assembler::inttohex(int n, int prelength) {
     string s;
     stringstream sstream;
     sstream << setfill('0') << setw(prelength) << hex << (int)n;
@@ -190,7 +207,7 @@ string inttohex(int n, int prelength) {
     return s;
 }
 
-string bintohex(bool a, bool b, bool c, bool d) {
+string Assembler::bintohex(int a, int b, int c, int d) {
     string s;
     int sum = 0;
     sum += (int)d * 1;
@@ -201,7 +218,7 @@ string bintohex(bool a, bool b, bool c, bool d) {
     return s;
 }
 
-string readdr(string res) {
+string Assembler::readdr(string res) {
     int x = hextoint(res);
     if (x - pc > -256 && x - pc < 4096) {
         checkpc = 1;
@@ -212,7 +229,7 @@ string readdr(string res) {
     }
 }
 
-string format2(int i) {
+string Assembler::format2(int i) {
     string s, r1, r2 = "A", result;
     s = prog[i].second[2];  // operand
     int j;
@@ -227,7 +244,7 @@ string format2(int i) {
     return result;
 }
 
-string format3(int i) {
+string Assembler::format3(int i) {
     string adr = prog[i].second[2], res1, res2, res3;
     bool nixbpe[6] = {}, dr = 0;
     int no = 0;
@@ -292,7 +309,7 @@ string format3(int i) {
     return res3;
 }
 
-string format4(int bb) {
+string Assembler::format4(int bb) {
     string z = prog[bb].second[2], te = prog[bb].second[1], TA = "", obcode;
     int no = 0;
     bool nixbpe[6] = {0, 0, 0, 0, 0, 0};
@@ -344,7 +361,7 @@ string format4(int bb) {
     return res3;
 }
 
-void objectFile() {
+void Assembler::writeObjectFile() {
     ofstream obcodeFile("output.txt");
     int sz = obcode.size();
     obcodeFile << "H^" << programName;
@@ -370,7 +387,7 @@ void objectFile() {
     obcodeFile.close();
 }
 
-void getInput(string l, string &a, string &b, string &c) {
+void Assembler::getInput(string l, string &a, string &b, string &c) {
     string x, y, z;
 
     if (l[0] == ' ')
@@ -396,4 +413,17 @@ void getInput(string l, string &a, string &b, string &c) {
     a = x;
     b = y;
     c = z;
+}
+
+int main() {
+    Assembler a;
+    string filename;
+
+    do {
+        cout << "Enter the file name: ";
+        cin >> filename;
+
+    } while (a.compile(filename) != 0);
+
+    return 0;
 }
